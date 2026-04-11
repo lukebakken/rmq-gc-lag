@@ -1,6 +1,6 @@
 URIS := amqp://guest:guest@10.0.1.121:5672,amqp://guest:guest@10.0.1.74:5672,amqp://guest:guest@10.0.1.194:5672
 PERF_TEST_JAR := /home/ec2-user/rabbitmq-perf-test/target/perf-test.jar
-JAVA_OPTS := -Xmx1500m
+JAVA_OPTS := -Xmx1700m
 BASELINE_MINUTES := 30
 
 .PHONY: webhook-consumer webhook-publisher main-workload
@@ -32,7 +32,7 @@ main-workload:
 		--consumers 100 \
 		--size 122880 \
 		--confirm 100 \
-		--qos 100 \
+		--qos 130 \
 		--consumer-latency 360000000 \
 		--variable-rate "150:$$(($(BASELINE_MINUTES) * 60))" \
 		--variable-rate '500:86400' \

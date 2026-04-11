@@ -15,7 +15,7 @@ set -o pipefail
 
 declare -r uris='amqp://guest:guest@10.0.1.121:5672,amqp://guest:guest@10.0.1.74:5672,amqp://guest:guest@10.0.1.194:5672'
 declare -r perf_test_jar='/home/ec2-user/rabbitmq-perf-test/target/perf-test.jar'
-declare -r java_opts='-Xmx1500m'
+declare -r java_opts='-Xmx1700m'
 declare -ri baseline_minutes="${1:-30}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly script_dir
@@ -74,7 +74,7 @@ main() {
         --consumers 100 \
         --size 122880 \
         --confirm 100 \
-        --qos 100 \
+        --qos 130 \
         --consumer-latency 360000000 \
         --variable-rate "150:$((baseline_minutes * 60))" \
         --variable-rate '500:86400' \
