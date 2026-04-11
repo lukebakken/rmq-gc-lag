@@ -1,5 +1,6 @@
 URIS := amqp://guest:guest@10.0.1.121:5672,amqp://guest:guest@10.0.1.74:5672,amqp://guest:guest@10.0.1.194:5672
 PERF_TEST_JAR := /home/ec2-user/rabbitmq-perf-test/target/perf-test.jar
+JAVA_OPTS := -Xmx1500m
 BASELINE_MINUTES := 30
 
 .PHONY: webhook-consumer webhook-publisher main-workload
@@ -10,7 +11,7 @@ webhook-consumer:
 		2>&1 | tee webhook_consumer.log
 
 webhook-publisher:
-	java -jar $(PERF_TEST_JAR) \
+	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
 		--uris $(URIS) \
 		--queue webhook_retry_queue \
 		--producers 1 \
@@ -22,7 +23,7 @@ webhook-publisher:
 		2>&1 | tee webhook_publisher.log
 
 main-workload:
-	java -jar $(PERF_TEST_JAR) \
+	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
 		--uris $(URIS) \
 		--queue-pattern 'repro-queue-%d' \
 		--queue-pattern-from 1 \

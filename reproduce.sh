@@ -15,6 +15,7 @@ set -o pipefail
 
 declare -r uris='amqp://guest:guest@10.0.1.121:5672,amqp://guest:guest@10.0.1.74:5672,amqp://guest:guest@10.0.1.194:5672'
 declare -r perf_test_jar='/home/ec2-user/rabbitmq-perf-test/target/perf-test.jar'
+declare -r java_opts='-Xmx1500m'
 declare -ri baseline_minutes="${1:-30}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly script_dir
@@ -48,7 +49,7 @@ main() {
     log_success "Pika consumer PID: $pika_pid"
 
     log_info "Starting webhook_retry_queue publisher (3 msg/s)..."
-    java -jar "$perf_test_jar" \
+    java $java_opts -jar "$perf_test_jar" \
         --uris "$uris" \
         --queue webhook_retry_queue \
         --producers 1 \
@@ -64,7 +65,7 @@ main() {
     # Target ~75K unacked: 100 queues x QoS 500 x 6-min consumer latency
     # --variable-rate 150:N runs at 150 msg/s for N seconds, then 500:0 runs indefinitely
     log_info "Starting main 100-queue workload..."
-    java -jar "$perf_test_jar" \
+    java $java_opts -jar "$perf_test_jar" \
         --uris "$uris" \
         --queue-pattern 'repro-queue-%d' \
         --queue-pattern-from 1 \
