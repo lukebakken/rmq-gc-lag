@@ -21,6 +21,9 @@ webhook-publisher:
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
 		--uris $(URIS) \
 		--queue webhook_retry_queue \
+		--flag mandatory \
+		--flag persistent \
+		--auto-delete false \
 		--producers 1 \
 		--consumers 0 \
 		--rate 3 \
@@ -35,6 +38,9 @@ main-workload:
 		--queue-pattern 'repro-queue-%d' \
 		--queue-pattern-from 1 \
 		--queue-pattern-to 100 \
+		--flag mandatory \
+		--flag persistent \
+		--auto-delete false \
 		--producers 100 \
 		--consumers 100 \
 		--size 122880 \
