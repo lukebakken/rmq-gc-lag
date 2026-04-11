@@ -34,7 +34,7 @@ main-workload:
 		--confirm 100 \
 		--qos 130 \
 		--consumer-latency 360000000 \
-		--variable-rate "150:$$(($(BASELINE_MINUTES) * 60))" \
-		--variable-rate '500:86400' \
+		--variable-rate "2:$$(($(BASELINE_MINUTES) * 60))" \
+		--variable-rate '5:86400' \
 		--id main-workload \
 		2>&1 | tee main_workload.log
