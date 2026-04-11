@@ -4,6 +4,7 @@ JAVA_OPTS := -Xmx1700m
 BASELINE_MINUTES := 30
 MGMT := http://guest:guest@10.0.1.121:15672
 
+.ONESHELL:
 .PHONY: ha-policy webhook-consumer webhook-publisher main-workload
 
 ha-policy:
@@ -13,11 +14,13 @@ ha-policy:
 		-d '{"pattern":".*","definition":{"ha-mode":"all","ha-sync-mode":"automatic","queue-version":2},"apply-to":"classic_queues"}'
 
 webhook-consumer:
+	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_consumer.log
 	python3 webhook_consumer.py \
 		--uri amqp://guest:guest@10.0.1.121:5672 \
-		2>&1 | tee webhook_consumer.log
+		2>&1 | tee -a webhook_consumer.log
 
 webhook-publisher:
+	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_publisher.log
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
 		--uris $(URIS) \
 		--queue webhook_retry_queue \
@@ -30,9 +33,10 @@ webhook-publisher:
 		--size 122880 \
 		--confirm 100 \
 		--id webhook-publisher \
-		2>&1 | tee webhook_publisher.log
+		2>&1 | tee -a webhook_publisher.log
 
 main-workload:
+	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > main_workload.log
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
 		--uris $(URIS) \
 		--queue-pattern 'repro-queue-%d' \
@@ -48,4 +52,4 @@ main-workload:
 		--variable-rate "2:$$(($(BASELINE_MINUTES) * 60))" \
 		--variable-rate '5:86400' \
 		--id main-workload \
-		2>&1 | tee main_workload.log
+		2>&1 | tee -a main_workload.log
