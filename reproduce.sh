@@ -74,7 +74,7 @@ main() {
         --consumers 100 \
         --size 122880 \
         --confirm 100 \
-        --qos 500 \
+        --qos 100 \
         --consumer-latency 360000000 \
         --variable-rate "150:$((baseline_minutes * 60))" \
         --variable-rate '500:86400' \
