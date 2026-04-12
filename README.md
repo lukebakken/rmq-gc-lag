@@ -1,59 +1,45 @@
 # RabbitMQ Classic Queue GC Lag Reproduction
 
-Reproduces classic queue message store GC lag caused by a publish rate spike
-against a broker with long-timeout consumer queues in the same vhost.
+Reproduces classic queue message store GC lag on a single-instance RabbitMQ broker.
 
-Also demonstrates the vhost isolation mitigation: moving long-timeout consumer
-queues to a dedicated vhost prevents their unacked messages from pinning segment
-files in the high-throughput vhost's message store.
+When a consumer holds acks for a long time, the unacked messages pin segment files in the shared message store. If a high-throughput queue is in the same message store, GC cannot reclaim those files even after the high-throughput messages are consumed and acknowledged. Disk usage grows until the consumer finally acks or the broker is restarted.
+
+This repository was created to reproduce a production incident on Amazon MQ for RabbitMQ and to demonstrate the vhost isolation mitigation. See [FUTURE.md](FUTURE.md) for planned follow-on experiments.
 
 ## How It Works
 
 Three processes run concurrently:
 
-- **main-workload**: 100 classic queues (`repro-queue-1` through `repro-queue-100`)
-  in the `/` vhost. 100 producers + 100 consumers, 120 KB messages, consumers acking
-  immediately. Variable rate: 2 msg/s per producer (200 msg/s aggregate) for
-  `BASELINE_MINUTES`, then 5 msg/s per producer (500 msg/s aggregate) indefinitely.
+- **main-workload**: 100 classic queues (`repro-queue-1` through `repro-queue-100`) in the `/` vhost. 100 producers + 100 consumers, 120 KB messages, consumers acking immediately. Variable rate: 2 msg/s per producer (200 msg/s aggregate) for `BASELINE_MINUTES`, then 5 msg/s per producer (500 msg/s aggregate) indefinitely.
 
 - **webhook-publisher**: 1 producer publishing 3 msg/s to `webhook_retry_queue`.
 
-- **webhook-consumer**: Pika consumer on `webhook_retry_queue` holding acks for a
-  random 1–29.8 minute duration (up to 1000 messages in flight simultaneously).
-
-By default all three processes use the `/` vhost. To demonstrate the mitigation,
-run `webhook-publisher` and `webhook-consumer` with `VHOST=webhook` after running
-`make create-vhost VHOST=webhook`.
+- **webhook-consumer**: Pika consumer on `webhook_retry_queue` holding acks for a random 1–29.8 minute duration (up to 1000 messages in flight simultaneously).
 
 ## Prerequisites
 
-On the perf-test host:
+On the host running the workload:
 
 - Java with `/home/ec2-user/rabbitmq-perf-test/target/perf-test.jar`
 - Python 3.9+ with pika: `pip3 install pika`
+- RabbitMQ running locally (or set `NODE=guest:guest@<host>`)
 
 ## Makefile Targets
 
 ```bash
-# Apply HA policy to a vhost (default: /)
-make ha-policy
-make ha-policy VHOST=webhook
+# Apply queue-version:2 policy to / vhost
+make classic-policy
 
-# Create a vhost, grant guest permissions, apply HA policy
-make create-vhost VHOST=webhook
-
-# Delete all queues across all vhosts
+# Delete all queues
 make clean
 
-# Start the Pika webhook consumer (default vhost: /)
+# Start the Pika webhook consumer
 make webhook-consumer
-make webhook-consumer VHOST=webhook
 
-# Start the webhook_retry_queue publisher (default vhost: /)
+# Start the webhook_retry_queue publisher
 make webhook-publisher
-make webhook-publisher VHOST=webhook
 
-# Start the 100-queue main workload (always uses / vhost)
+# Start the 20-queue main workload
 make main-workload
 make main-workload BASELINE_MINUTES=45
 ```
@@ -61,10 +47,10 @@ make main-workload BASELINE_MINUTES=45
 Each target runs in the foreground. Start each in a separate terminal.
 Log files are written to the current directory with a UTC timestamp on the first line.
 
-## Experiment 1: Baseline (same vhost, reproduces the incident)
+## Running the Reproduction
 
 ```bash
-make ha-policy
+make classic-policy
 # terminal 1
 make webhook-consumer
 # terminal 2
@@ -73,34 +59,13 @@ make webhook-publisher
 make main-workload
 ```
 
-Expected: disk free declines steadily on all nodes. Rate accelerates after the spike.
-
-## Experiment 2: Vhost isolation (demonstrates the mitigation)
+Monitor disk free via the Prometheus endpoint:
 
 ```bash
-make ha-policy
-make create-vhost VHOST=webhook
-# terminal 1
-make webhook-consumer VHOST=webhook
-# terminal 2
-make webhook-publisher VHOST=webhook
-# terminal 3
-make main-workload
+curl -s http://localhost:15692/metrics | grep '^rabbitmq_disk_space_available_bytes'
 ```
 
-Expected: disk free is stable throughout, even after the spike. The `/` vhost's
-message store GC runs freely because `webhook_retry_queue`'s unacked messages are
-isolated in the `/webhook` vhost.
-
-## Monitoring
-
-```bash
-# Publish/ack rates and queue totals
-curl -s -u guest:guest http://NODE:15672/api/overview | jq '{queue_totals, message_stats}'
-
-# Disk free per node
-curl -s http://NODE:15692/metrics | grep '^rabbitmq_disk_space_available_bytes'
-```
+Expected: disk free declines steadily. Rate accelerates after the spike at `BASELINE_MINUTES`.
 
 ## Files
 

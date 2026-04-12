@@ -1,46 +1,29 @@
 PERF_TEST_JAR := /home/ec2-user/rabbitmq-perf-test/target/perf-test.jar
 JAVA_OPTS := -Xmx1700m
 BASELINE_MINUTES := 30
-NODE0 := guest:guest@10.0.1.95
-NODE1 := guest:guest@10.0.1.120
-NODE2 := guest:guest@10.0.1.25
-MGMT := http://$(NODE0):15672
-VHOST := %2F
-URIS := amqp://$(NODE0)/$(VHOST),amqp://$(NODE1):5672/$(VHOST),amqp://$(NODE2):5672/$(VHOST)
+NODE := guest:guest@10.0.1.90
+MGMT := http://$(NODE):15672
+URI := amqp://$(NODE):5672
 
 .ONESHELL:
-.PHONY: ha-policy create-vhost clean webhook-consumer webhook-publisher main-workload
+.PHONY: classic-policy clean webhook-consumer webhook-publisher main-workload
 
-ha-policy:
+classic-policy:
 	curl -sf -u guest:guest \
-		-X PUT $(MGMT)/api/policies/$(VHOST)/ha-all \
+		-X PUT $(MGMT)/api/policies/%2F/classic-all \
 		-H 'Content-Type: application/json' \
-		-d '{"pattern":".*","definition":{"ha-mode":"all","ha-sync-mode":"automatic","queue-version":2},"apply-to":"classic_queues"}'
-
-create-vhost:
-	curl -sf -u guest:guest \
-		-X PUT $(MGMT)/api/vhosts/$(VHOST) \
-		-H 'Content-Type: application/json' \
-		-d '{}'
-	curl -sf -u guest:guest \
-		-X PUT $(MGMT)/api/permissions/$(VHOST)/guest \
-		-H 'Content-Type: application/json' \
-		-d '{"configure":".*","write":".*","read":".*"}'
-	curl -sf -u guest:guest \
-		-X PUT $(MGMT)/api/policies/$(VHOST)/ha-all \
-		-H 'Content-Type: application/json' \
-		-d '{"pattern":".*","definition":{"ha-mode":"all","ha-sync-mode":"automatic","queue-version":2},"apply-to":"classic_queues"}'
+		-d '{"pattern":".*","definition":{"queue-version":2},"apply-to":"classic_queues"}'
 
 webhook-consumer:
 	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_consumer.log
 	python3 webhook_consumer.py \
-		--uri amqp://$(NODE0):5672/$(VHOST) \
+		--uri amqp://$(NODE):5672 \
 		2>&1 | tee -a webhook_consumer.log
 
 webhook-publisher:
 	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_publisher.log
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
-		--uris $(URIS) \
+		--uri $(URI) \
 		--queue webhook_retry_queue \
 		--flag mandatory \
 		--flag persistent \
@@ -61,7 +44,7 @@ clean:
 main-workload:
 	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > main_workload.log
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
-		--uris $(URIS) \
+		--uri $(URI) \
 		--queue-pattern 'repro-queue-%d' \
 		--queue-pattern-from 1 \
 		--queue-pattern-to 100 \
