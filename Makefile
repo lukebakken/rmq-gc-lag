@@ -1,9 +1,12 @@
-URIS := amqp://guest:guest@10.0.1.121:5672,amqp://guest:guest@10.0.1.74:5672,amqp://guest:guest@10.0.1.194:5672
 PERF_TEST_JAR := /home/ec2-user/rabbitmq-perf-test/target/perf-test.jar
 JAVA_OPTS := -Xmx1700m
 BASELINE_MINUTES := 30
-MGMT := http://guest:guest@10.0.1.121:15672
+NODE0 := guest:guest@10.0.1.95
+NODE1 := guest:guest@10.0.1.120
+NODE2 := guest:guest@10.0.1.25
+MGMT := http://$(NODE0):15672
 VHOST := %2F
+URIS := amqp://$(NODE0)/$(VHOST),amqp://$(NODE1):5672/$(VHOST),amqp://$(NODE2):5672/$(VHOST)
 
 .ONESHELL:
 .PHONY: ha-policy create-vhost clean webhook-consumer webhook-publisher main-workload
@@ -31,13 +34,13 @@ create-vhost:
 webhook-consumer:
 	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_consumer.log
 	python3 webhook_consumer.py \
-		--uri amqp://guest:guest@10.0.1.121:5672/$(VHOST) \
+		--uri $(NODE0):5672/$(VHOST) \
 		2>&1 | tee -a webhook_consumer.log
 
 webhook-publisher:
 	date -u +'started: %Y-%m-%dT%H:%M:%SZ' > webhook_publisher.log
 	java $(JAVA_OPTS) -jar $(PERF_TEST_JAR) \
-		--uris "amqp://guest:guest@10.0.1.121:5672/$(VHOST),amqp://guest:guest@10.0.1.74:5672/$(VHOST),amqp://guest:guest@10.0.1.194:5672/$(VHOST)" \
+		--uris $(URIS) \
 		--queue webhook_retry_queue \
 		--flag mandatory \
 		--flag persistent \
